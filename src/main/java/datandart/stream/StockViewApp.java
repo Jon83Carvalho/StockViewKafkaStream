@@ -28,7 +28,7 @@ public class StockViewApp {
         Properties config=new Properties();
 
         config.put(StreamsConfig.APPLICATION_ID_CONFIG,"stock-view-app");
-        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,"a76197fa2588a47aea359537203d8b52-417937669.us-east-2.elb.amazonaws.com:9092");
+        config.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:30100");
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,"earliest");
         config.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG,"0");
         config.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,Serdes.String().getClass());
@@ -47,14 +47,21 @@ public class StockViewApp {
         //1 - Stream from Kafka
         KStream<String,JsonNode> volumeRecord=builder.stream("stock-input", Consumed.with(Serdes.String(), jsonSerde));
 
+//        KStream<String,JsonNode> countRecord=builder.stream("stock-input-count", Consumed.with(Serdes.String(), jsonSerde));
+
         //create json object
         ObjectNode initialVolume= JsonNodeFactory.instance.objectNode();
         initialVolume.put("Price",0.0);
         initialVolume.put("Volume",0.0);
 
 
+        ObjectNode initialCount= JsonNodeFactory.instance.objectNode();
+        initialCount.put("Count",0);
+
+
+        //Ktables
         KTable<String,JsonNode> volumedata=volumeRecord
-                //1 - Agrupanddo os valroes
+                //1 - Agrupanddo os valores
                 .groupByKey()
                 .aggregate(
                         ()->initialVolume,
@@ -66,6 +73,20 @@ public class StockViewApp {
 
         volumedata.toStream().to("stock-output", Produced.with(Serdes.String(),jsonSerde));
 
+//        KTable<String,JsonNode> countdata=countRecord
+                //1 - Contando os valores
+//                .groupByKey()
+//                .aggregate(
+//                        ()->initialCount,
+//                        (key,count,stockcount)-> stockCount(count,stockcount),
+//                        Materialized.<String,JsonNode, KeyValueStore<Bytes,byte[]>>as("count-volume-agg")
+//                                .withKeySerde(Serdes.String())
+//                                .withValueSerde(jsonSerde)
+//
+//                );
+
+//        countdata.toStream().to("stock-output-count", Produced.with(Serdes.String(),jsonSerde));
+
         KafkaStreams streams=new KafkaStreams(builder.build(),config);
 
         streams.start();
@@ -76,7 +97,7 @@ public class StockViewApp {
         Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
 
 
-    }
+                                                                                                                                                                    }
     private static JsonNode stockTrade(JsonNode trade, JsonNode stockposition) {
 
         //create new trade json object
@@ -85,7 +106,14 @@ public class StockViewApp {
 
         return newPosition;
     }
+    private static JsonNode stockCount(JsonNode count, JsonNode stockcount) {
 
+        //create new coun json object
+        ObjectNode newCount=JsonNodeFactory.instance.objectNode();
+        newCount.put("Count",stockcount.get("Count").asInt()+1);
+
+        return newCount;
+    }
 
 
 }
