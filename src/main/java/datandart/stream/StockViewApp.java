@@ -47,7 +47,7 @@ public class StockViewApp {
         //1 - Stream from Kafka
         KStream<String,JsonNode> volumeRecord=builder.stream("stock-input", Consumed.with(Serdes.String(), jsonSerde));
 
-//        KStream<String,JsonNode> countRecord=builder.stream("stock-input-count", Consumed.with(Serdes.String(), jsonSerde));
+        KStream<String,JsonNode> countRecord=builder.stream("stock-input-count", Consumed.with(Serdes.String(), jsonSerde));
 
         //create json object
         ObjectNode initialVolume= JsonNodeFactory.instance.objectNode();
@@ -73,19 +73,19 @@ public class StockViewApp {
 
         volumedata.toStream().to("stock-output", Produced.with(Serdes.String(),jsonSerde));
 
-//        KTable<String,JsonNode> countdata=countRecord
+        KTable<String,JsonNode> countdata=countRecord
                 //1 - Contando os valores
-//                .groupByKey()
-//                .aggregate(
-//                        ()->initialCount,
-//                        (key,count,stockcount)-> stockCount(count,stockcount),
-//                        Materialized.<String,JsonNode, KeyValueStore<Bytes,byte[]>>as("count-volume-agg")
-//                                .withKeySerde(Serdes.String())
-//                                .withValueSerde(jsonSerde)
+                .groupByKey()
+                .aggregate(
+                        ()->initialCount,
+                        (key,count,stockcount)-> stockCounting(count,stockcount),
+                        Materialized.<String,JsonNode, KeyValueStore<Bytes,byte[]>>as("count-volume-agg")
+                                .withKeySerde(Serdes.String())
+                                .withValueSerde(jsonSerde)
 //
-//                );
+                );
 
-//        countdata.toStream().to("stock-output-count", Produced.with(Serdes.String(),jsonSerde));
+        countdata.toStream().to("stock-output-count", Produced.with(Serdes.String(),jsonSerde));
 
         KafkaStreams streams=new KafkaStreams(builder.build(),config);
 
@@ -94,7 +94,7 @@ public class StockViewApp {
         //print the topology
         System.out.println(streams.toString());
 
-        Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
+            Runtime.getRuntime().addShutdownHook(new Thread(streams::close));
 
 
                                                                                                                                                                     }
@@ -102,13 +102,13 @@ public class StockViewApp {
 
         //create new trade json object
         ObjectNode newPosition=JsonNodeFactory.instance.objectNode();
-        newPosition.put("Volume",stockposition.get("Volume").asDouble()+trade.get("s").asDouble());
+        newPosition.put("Volume",stockposition.get("Volume").asDouble()+trade.get("size").asDouble());
 
         return newPosition;
     }
-    private static JsonNode stockCount(JsonNode count, JsonNode stockcount) {
+    private static JsonNode stockCounting(JsonNode count, JsonNode stockcount) {
 
-        //create new coun json object
+        //create new count json object
         ObjectNode newCount=JsonNodeFactory.instance.objectNode();
         newCount.put("Count",stockcount.get("Count").asInt()+1);
 
